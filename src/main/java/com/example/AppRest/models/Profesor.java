@@ -5,13 +5,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import javax.persistence.*;
 import javax.validation.constraints.NotEmpty;
 import javax.validation.constraints.NotNull;
 import javax.validation.constraints.PositiveOrZero;
 
-@NoArgsConstructor @AllArgsConstructor @Getter @Setter
+@Entity @Table(name = "profesor") @NoArgsConstructor @AllArgsConstructor @Getter @Setter
 public class Profesor {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id_profesor")
     @NotNull
     @PositiveOrZero
     private long id;
@@ -29,5 +33,10 @@ public class Profesor {
     @NotNull
     @PositiveOrZero
     private int horasClase;
+
+    @Override
+    public String toString() {
+        return "Professor{id:" + id + ", numeroEmpleado:" + numeroEmpleado + ", nombres:'" + nombres + '\'' + ", apellidos:'" + apellidos + '\'' + ", horasClase:'" + horasClase + '\'' + '}';
+    }
 
 }

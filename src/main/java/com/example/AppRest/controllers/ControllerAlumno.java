@@ -7,71 +7,77 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import javax.validation.Valid;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Optional;
 
 @RestController
+@RequestMapping(value = "/", produces = "application/json")
 public class ControllerAlumno {
 
     @Autowired
-    private AlumnoServices alumnoServices = new AlumnoServices();
+    AlumnoServices studentRepository;
 
-    @GetMapping("/alumnos")
-    public ResponseEntity GETAlumnos () {
-        return new ResponseEntity(alumnoServices.getAlumnos(),HttpStatus.OK);
+    @Autowired
+    private S3Controller s3Service;
+
+    @GetMapping(path = "/alumnos")
+    public List<Alumno> getAll() {
+        return studentRepository.findAll();
     }
 
     @GetMapping(path = "/alumnos/{id}")
-    public ResponseEntity<Alumno> getAlumno (@PathVariable long id) {
-        Alumno alumno = alumnoServices.getUnAlumno(id);
-        if (alumno == null) {
+    public ResponseEntity<Alumno> getStudent(@PathVariable long id) {
+        Optional<Alumno> studentOptional = studentRepository.findById(id);
+        if (studentOptional.isEmpty()) {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-        return new ResponseEntity<>(alumno, HttpStatus.OK);
+        return new ResponseEntity<>(studentOptional.get(), HttpStatus.OK);
     }
 
     @PostMapping(path = "/alumnos", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity POSTAlumnos (@RequestBody @Valid Alumno alumno) {
-        ResponseEntity response;
-        boolean status;
-
-        try {
-            status = alumnoServices.addAlumno(alumno);
-        }catch (Exception e) {
-            status = false;
-        }
-
-
-        if (status) {
-            response = new ResponseEntity("Creado con éxito", HttpStatus.CREATED);
-        } else {
-            response = new ResponseEntity("Error al crear", HttpStatus.BAD_REQUEST);
-        }
-
-        return response;
+    public ResponseEntity<String> addStudent(@RequestBody @Valid Alumno student) {
+        studentRepository.saveAndFlush(student);
+        return new ResponseEntity<>("{\"id\":" + student.getId() + '}', HttpStatus.CREATED);
     }
 
     @PutMapping(path = "/alumnos/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity PUTAlumnos (@PathVariable int id, @Valid @RequestBody Alumno alumno) {
-        if (alumnoServices.updateAlumno(id,alumno)){
-            return new ResponseEntity("Actualizado con exito",HttpStatus.OK);
+    public ResponseEntity<String> updateStudent(@PathVariable Long id, @Valid @RequestBody Alumno student) {
+        if (studentRepository.findById(id).isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-        return new ResponseEntity("No se ha actualizado",HttpStatus.NOT_FOUND);
+        student.setId(id);
+        studentRepository.save(student);
+        return new ResponseEntity<>("Student updated", HttpStatus.OK);
     }
 
-    @DeleteMapping(path = "/alumnos/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> DELETEAlumno (@PathVariable long id) {
-        ResponseEntity response;
-
-        if (alumnoServices.deleteAlumno(id)){
-            response = new ResponseEntity("Eliminado correctamente",HttpStatus.OK);
-        }else{
-            response = new ResponseEntity("No se encontró el alumno",HttpStatus.NOT_FOUND);
+    @DeleteMapping(path = "/alumnos/{id}")
+    public ResponseEntity<String> deleteStudent(@PathVariable long id) {
+        Optional<Alumno> studentOptional = studentRepository.findById(id);
+        if (studentOptional.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
-
-        return response;
+        studentRepository.delete(studentOptional.get());
+        return new ResponseEntity<>("Professor updated", HttpStatus.OK);
     }
 
+    @PostMapping(path = "/alumnos/{id}/fotoPerfil", produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<HashMap<String, String>> addStudentAndPhoto(@PathVariable long id, @RequestPart(value="foto") MultipartFile file){
 
+        s3Service.uploadFile(id,file);
+        String URLfromS3 = s3Service.getLinkFromS3(id,file.getOriginalFilename());
+
+        Alumno student = studentRepository.getById(id);
+        student.setFotoPerfilUrl(URLfromS3);
+        studentRepository.save(student);
+
+        HashMap<String,String>Json = new HashMap<>();
+        Json.put("fotoPerfilUrl",student.getFotoPerfilUrl());
+
+        return ResponseEntity.status(HttpStatus.OK).contentType(MediaType.APPLICATION_JSON).body(Json);
+    }
 
 }
